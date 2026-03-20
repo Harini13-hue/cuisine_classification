@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuisine Classification | Cognifyz Task 3</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',sans-serif; background:#f8fafc; color:#1e293b; }
+
+.header {
+  background: linear-gradient(135deg,#1e293b,#334155);
+  padding: 50px 40px; text-align:center;
+}
+.header h1 { font-size:2.5rem; font-weight:800; color:white; margin-bottom:10px; }
+.header p { color:rgba(255,255,255,0.7); font-size:1rem; }
+
+.stats-row {
+  display:flex; gap:16px; padding:30px 40px;
+  justify-content:center; flex-wrap:wrap;
+  background:white; border-bottom:1px solid #e2e8f0;
+}
+.stat-card {
+  text-align:center; padding:20px 28px;
+  border-radius:12px; min-width:140px;
+  border:1px solid #e2e8f0;
+  background:white;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+.stat-card .value { font-size:1.8rem; font-weight:800; }
+.stat-card .label { font-size:0.8rem; color:#64748b; margin-top:4px; }
+
+.ml-info { background:#f1f5f9; padding:16px 40px; text-align:center; border-bottom:1px solid #e2e8f0; }
+.ml-badge {
+  background:#1e293b; color:white;
+  padding:5px 14px; border-radius:999px;
+  font-size:0.78rem; font-weight:600;
+  display:inline-block; margin:3px;
+}
+
+.section { padding:32px 40px; }
+.section-title {
+  font-size:1.2rem; font-weight:700; color:#1e293b;
+  margin-bottom:20px; padding-bottom:10px;
+  border-bottom:2px solid #e2e8f0;
+  display:flex; align-items:center; gap:8px;
+}
+
+/* Cuisine Cards */
+.cards-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:20px;
+}
+.cuisine-card {
+  background:white; border-radius:16px;
+  padding:20px; border:1px solid #e2e8f0;
+  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+  animation: slideUp 0.5s ease forwards;
+  opacity:0; transform:translateY(20px);
+}
+@keyframes slideUp {
+  to { opacity:1; transform:translateY(0); }
+}
+.card-header {
+  display:flex; align-items:center;
+  gap:12px; margin-bottom:16px;
+}
+.emoji { font-size:2rem; }
+.cuisine-name { font-size:1rem; font-weight:700; color:#1e293b; }
+.support { font-size:0.78rem; color:#94a3b8; margin-top:2px; }
+.grade {
+  margin-left:auto; width:36px; height:36px;
+  border-radius:50%; display:flex;
+  align-items:center; justify-content:center;
+  font-weight:800; font-size:0.9rem; color:white;
+}
+.metric-row {
+  display:flex; align-items:center;
+  gap:8px; margin-bottom:10px;
+}
+.metric-label { font-size:0.75rem; color:#64748b; width:65px; flex-shrink:0; }
+.bar-bg { flex:1; background:#f1f5f9; border-radius:999px; height:8px; overflow:hidden; }
+.bar-fill {
+  height:100%; border-radius:999px;
+  transition:width 1.5s ease;
+  width:0%;
+}
+.metric-val { font-size:0.78rem; font-weight:700; color:#1e293b; width:30px; text-align:right; }
+
+/* Charts */
+.charts-row { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.chart-card {
+  background:white; border-radius:16px;
+  padding:24px; border:1px solid #e2e8f0;
+  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+}
+.chart-card h3 {
+  font-size:0.9rem; font-weight:700; color:#475569;
+  margin-bottom:16px; text-transform:uppercase;
+  letter-spacing:0.06em;
+}
+canvas { max-height:260px; }
+
+/* Insights */
+.insights-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.insight-card {
+  background:white; border-radius:12px;
+  padding:18px; border:1px solid #e2e8f0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+}
+.insight-icon { font-size:1.5rem; margin-bottom:8px; }
+.insight-title { font-size:0.8rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+.insight-text { font-size:0.88rem; color:#475569; line-height:1.5; }
+.highlight { color:#16a34a; font-weight:700; }
+.warning { color:#dc2626; font-weight:700; }
+
+.footer {
+  text-align:center; padding:24px;
+  color:#94a3b8; font-size:0.82rem;
+  border-top:1px solid #e2e8f0;
+  background:white; margin-top:10px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🍜 Cuisine Classification Model</h1>
+  <p>Random Forest Classifier &nbsp;|&nbsp; Cognifyz Internship Task 3 &nbsp;|&nbsp; Zomato Dataset</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="value" style="color:#1e293b">7,014</div>
+    <div class="label">Restaurants Analyzed</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color:#6366f1">10</div>
+    <div class="label">Cuisines Classified</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color:#ca8a04">45%</div>
+    <div class="label">Overall Accuracy</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color:#0891b2">100</div>
+    <div class="label">Decision Trees</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color:#16a34a">77%</div>
+    <div class="label">Best Recall</div>
+  </div>
+</div>
+
+<div class="ml-info">
+  <span class="ml-badge">✅ Random Forest</span>
+  <span class="ml-badge">✅ Logistic Regression</span>
+  <span class="ml-badge">✅ Precision & Recall</span>
+  <span class="ml-badge">✅ Bias Detection</span>
+  <span class="ml-badge">✅ Feature Importance</span>
+</div>
+
+<div class="section">
+  <div class="section-title">🍽️ Performance by Cuisine</div>
+  <div class="cards-grid">
+
+    <div class="cuisine-card" style="animation-delay:0.0s">
+      <div class="card-header">
+        <span class="emoji">🍔</span>
+        <div>
+          <div class="cuisine-name">American</div>
+          <div class="support">48 restaurants</div>
+        </div>
+        <div class="grade" style="background:#16a34a">A</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:63%;background:#16a34a"></div></div>
+        <span class="metric-val">0.63</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:61%;background:#6366f1"></div></div>
+        <span class="metric-val">0.61</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:65%;background:#0891b2"></div></div>
+        <span class="metric-val">0.65</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.1s">
+      <div class="card-header">
+        <span class="emoji">🥐</span>
+        <div>
+          <div class="cuisine-name">Bakery</div>
+          <div class="support">115 restaurants</div>
+        </div>
+        <div class="grade" style="background:#ea580c">C</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:26%;background:#ea580c"></div></div>
+        <span class="metric-val">0.26</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:28%;background:#6366f1"></div></div>
+        <span class="metric-val">0.28</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:23%;background:#0891b2"></div></div>
+        <span class="metric-val">0.23</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.2s">
+      <div class="card-header">
+        <span class="emoji">☕</span>
+        <div>
+          <div class="cuisine-name">Cafe</div>
+          <div class="support">127 restaurants</div>
+        </div>
+        <div class="grade" style="background:#ea580c">C</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:34%;background:#ea580c"></div></div>
+        <span class="metric-val">0.34</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:42%;background:#6366f1"></div></div>
+        <span class="metric-val">0.42</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:28%;background:#0891b2"></div></div>
+        <span class="metric-val">0.29</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.30000000000000004s">
+      <div class="card-header">
+        <span class="emoji">🥢</span>
+        <div>
+          <div class="cuisine-name">Chinese</div>
+          <div class="support">165 restaurants</div>
+        </div>
+        <div class="grade" style="background:#dc2626">F</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:16%;background:#dc2626"></div></div>
+        <span class="metric-val">0.16</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:24%;background:#6366f1"></div></div>
+        <span class="metric-val">0.24</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:12%;background:#0891b2"></div></div>
+        <span class="metric-val">0.12</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.4s">
+      <div class="card-header">
+        <span class="emoji">🍽️</span>
+        <div>
+          <div class="cuisine-name">Continental</div>
+          <div class="support">50 restaurants</div>
+        </div>
+        <div class="grade" style="background:#dc2626">F</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:12%;background:#dc2626"></div></div>
+        <span class="metric-val">0.12</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:21%;background:#6366f1"></div></div>
+        <span class="metric-val">0.21</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:8%;background:#0891b2"></div></div>
+        <span class="metric-val">0.08</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.5s">
+      <div class="card-header">
+        <span class="emoji">🍟</span>
+        <div>
+          <div class="cuisine-name">Fast Food</div>
+          <div class="support">137 restaurants</div>
+        </div>
+        <div class="grade" style="background:#dc2626">F</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:17%;background:#dc2626"></div></div>
+        <span class="metric-val">0.17</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:22%;background:#6366f1"></div></div>
+        <span class="metric-val">0.22</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:14%;background:#0891b2"></div></div>
+        <span class="metric-val">0.14</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.6000000000000001s">
+      <div class="card-header">
+        <span class="emoji">🍬</span>
+        <div>
+          <div class="cuisine-name">Mithai</div>
+          <div class="support">56 restaurants</div>
+        </div>
+        <div class="grade" style="background:#ea580c">C</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:34%;background:#ea580c"></div></div>
+        <span class="metric-val">0.34</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:33%;background:#6366f1"></div></div>
+        <span class="metric-val">0.33</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:34%;background:#0891b2"></div></div>
+        <span class="metric-val">0.34</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.7000000000000001s">
+      <div class="card-header">
+        <span class="emoji">🍛</span>
+        <div>
+          <div class="cuisine-name">North Indian</div>
+          <div class="support">598 restaurants</div>
+        </div>
+        <div class="grade" style="background:#16a34a">A</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:63%;background:#16a34a"></div></div>
+        <span class="metric-val">0.63</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:53%;background:#6366f1"></div></div>
+        <span class="metric-val">0.53</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:77%;background:#0891b2"></div></div>
+        <span class="metric-val">0.77</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.8s">
+      <div class="card-header">
+        <span class="emoji">🥘</span>
+        <div>
+          <div class="cuisine-name">South Indian</div>
+          <div class="support">57 restaurants</div>
+        </div>
+        <div class="grade" style="background:#dc2626">F</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:0%;background:#dc2626"></div></div>
+        <span class="metric-val">0.00</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:0%;background:#6366f1"></div></div>
+        <span class="metric-val">0.00</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:0%;background:#0891b2"></div></div>
+        <span class="metric-val">0.00</span>
+      </div>
+    </div>
+    <div class="cuisine-card" style="animation-delay:0.9s">
+      <div class="card-header">
+        <span class="emoji">🌮</span>
+        <div>
+          <div class="cuisine-name">Street Food</div>
+          <div class="support">50 restaurants</div>
+        </div>
+        <div class="grade" style="background:#ea580c">C</div>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">F1 Score</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:30%;background:#ea580c"></div></div>
+        <span class="metric-val">0.30</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Precision</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:33%;background:#6366f1"></div></div>
+        <span class="metric-val">0.33</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Recall</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:28%;background:#0891b2"></div></div>
+        <span class="metric-val">0.28</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">📊 Model Analysis</div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>📍 Feature Importance</h3>
+      <canvas id="featChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>⚖️ Precision vs Recall</h3>
+      <canvas id="prChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">🔍 Key Findings & Bias Analysis</div>
+  <div class="insights-row">
+    <div class="insight-card">
+      <div class="insight-icon">🏆</div>
+      <div class="insight-title">Best Performing</div>
+      <div class="insight-text"><span class="highlight">North Indian (77% recall)</span> and <span class="highlight">American (65%)</span> perform best — most training data available.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">⚠️</div>
+      <div class="insight-title">Critical Bias Found</div>
+      <div class="insight-text"><span class="warning">South Indian: 0% recall!</span> Only 57 samples — severe class imbalance causes complete prediction failure.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">📍</div>
+      <div class="insight-title">Location Dominates</div>
+      <div class="insight-text">Longitude & Latitude account for <span class="highlight">45.8% importance</span> — cuisines are strongly geography-dependent.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">🔄</div>
+      <div class="insight-title">Most Confused Pair</div>
+      <div class="insight-text"><span class="warning">Chinese predicted as North Indian 105 times</span> — similar price ranges and locations cause confusion.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">📊</div>
+      <div class="insight-title">Class Imbalance</div>
+      <div class="insight-text">North Indian has <span class="warning">598 samples</span> vs South Indian's <span class="warning">57</span> — 10x imbalance biases predictions.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">💡</div>
+      <div class="insight-title">How to Improve</div>
+      <div class="insight-text">SMOTE oversampling for minority cuisines + menu keyword features could significantly boost accuracy.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Built by Harini &nbsp;|&nbsp; Cognifyz Internship Task 3 &nbsp;|&nbsp; Cuisine Classification using Random Forest
+</div>
+
+<script>
+// Animate bars after load
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.querySelectorAll('.bar-fill').forEach(bar => {
+      const w = bar.style.width;
+      bar.style.width = '0%';
+      setTimeout(() => bar.style.width = w, 100);
+    });
+  }, 300);
+});
+
+const cuisines = ["American", "Bakery", "Cafe", "Chinese", "Continental", "Fast Food", "Mithai", "North Indian", "South Indian", "Street Food"];
+const precision = [0.61, 0.28, 0.42, 0.24, 0.21, 0.22, 0.33, 0.53, 0.0, 0.33];
+const recall = [0.65, 0.23, 0.29, 0.12, 0.08, 0.14, 0.34, 0.77, 0.0, 0.28];
+const featNames = ["Longitude", "Latitude", "Votes", "Avg Cost", "Rating", "City", "Price range", "Online Delivery", "Country Code", "Table Booking"];
+const featVals = [0.229, 0.229, 0.171, 0.139, 0.117, 0.046, 0.026, 0.02, 0.014, 0.009];
+
+new Chart(document.getElementById('featChart'), {
+  type: 'bar',
+  data: {
+    labels: featNames,
+    datasets: [{ data: featVals,
+      backgroundColor: ['#6366f1','#6366f1','#0891b2','#0891b2','#16a34a',
+                        '#ca8a04','#ea580c','#ec4899','#94a3b8','#94a3b8'],
+      borderRadius: 6 }]
+  },
+  options: {
+    indexAxis:'y',
+    animation: { duration: 1500, easing: 'easeOutQuart' },
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ ticks:{color:'#64748b'}, grid:{color:'#f1f5f9'} },
+      y:{ ticks:{color:'#475569', font:{size:11}}, grid:{display:false} }
+    }
+  }
+});
+
+new Chart(document.getElementById('prChart'), {
+  type: 'bar',
+  data: {
+    labels: cuisines,
+    datasets: [
+      { label:'Precision', data:precision, backgroundColor:'#6366f1', borderRadius:4 },
+      { label:'Recall',    data:recall,    backgroundColor:'#0891b2', borderRadius:4 }
+    ]
+  },
+  options: {
+    animation: { duration: 1500, easing: 'easeOutQuart' },
+    plugins:{ legend:{ labels:{ color:'#475569' } } },
+    scales:{
+      x:{ ticks:{color:'#64748b', font:{size:9}}, grid:{display:false} },
+      y:{ min:0, max:1, ticks:{color:'#64748b'}, grid:{color:'#f1f5f9'} }
+    }
+  }
+});
+</script>
+</body>
+</html>
